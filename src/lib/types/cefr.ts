@@ -1,0 +1,17 @@
+export const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1"] as const;
+
+export type CefrLevel = (typeof CEFR_LEVELS)[number];
+
+export interface UserCefrProfile {
+  written: CefrLevel;
+  spoken: CefrLevel;
+}
+
+export const DEFAULT_CEFR_PROFILE: UserCefrProfile = {
+  written: "A2",
+  spoken: "A2",
+};
+
+export function isCefrLevel(value: string): value is CefrLevel {
+  return (CEFR_LEVELS as readonly string[]).includes(value);
+}
