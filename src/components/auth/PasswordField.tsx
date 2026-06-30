@@ -172,7 +172,7 @@ interface PasswordFieldProps {
   onToggle: () => void;
 }
 
-function PasswordField({
+export function PasswordField({
   label,
   value,
   onChange,
