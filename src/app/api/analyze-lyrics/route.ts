@@ -72,13 +72,16 @@ function getDemoAnalysis(): LyricsAnalysisResult {
     ],
     clozeExercise: {
       instructions:
-        "Complétez les mots manquants en vous aidant du contexte.",
+        "Completez les 6 mots numerotes (1 a 6) dans l'ordre, un mot par trou.",
       textWithBlanks:
-        "I [BLANK] how long it will take, another [BLANK] coming my way. Just [BLANK] a little longer.",
+        "When I find myself in times of [BLANK]\nSpeaking words of [BLANK], let it be\nAnd in my hour of [BLANK] she is standing\nLet it be, let it be, whisper words of [BLANK]\nAnd when the night is [BLANK], there is still a [BLANK]",
       answers: [
-        { blankIndex: 0, word: "wonder", hint: "Verbe : se demander" },
-        { blankIndex: 1, word: "heartbreak", hint: "Nom : chagrin" },
-        { blankIndex: 2, word: "hold on", hint: "Expression : patienter" },
+        { blankIndex: 0, word: "trouble", hint: "Difficulte, probleme" },
+        { blankIndex: 1, word: "wisdom", hint: "Sagesse" },
+        { blankIndex: 2, word: "darkness", hint: "Obscurite" },
+        { blankIndex: 3, word: "wisdom", hint: "Sagesse (encore)" },
+        { blankIndex: 4, word: "cloudy", hint: "Nuageux" },
+        { blankIndex: 5, word: "light", hint: "Lumiere" },
       ],
     },
     comprehensionQuestions: [

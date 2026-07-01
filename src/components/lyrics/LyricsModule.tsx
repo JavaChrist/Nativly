@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { LyricsAnalysisResult } from "@/lib/prompts/analyze-lyrics";
 import type { AnalyzeLyricsResponse } from "@/app/api/analyze-lyrics/route";
 import type { Persona } from "@/lib/types/persona";
 import { MEI_PERSONA } from "@/lib/personas/mei";
+import type { SpeakFn } from "@/hooks/usePersonaSpeech";
 import {
   AnalysisHeader,
   DebugPanel,
@@ -15,13 +16,22 @@ import { IdiomsList } from "@/components/lyrics/IdiomsList";
 import { ClozeExerciseCard } from "@/components/lyrics/ClozeExerciseCard";
 import { ComprehensionQuestions } from "@/components/lyrics/ComprehensionQuestions";
 import { PersonaSpeaker } from "@/components/persona/PersonaSpeaker";
+import { SavedLyricsPicker } from "@/components/lyrics/SavedLyricsPicker";
+import {
+  loadLyricsDraft,
+  saveLyricsDraft,
+} from "@/lib/lyrics/draft-storage";
 
 export function LyricsModule() {
   const [lyrics, setLyrics] = useState("");
   const [musicGenre, setMusicGenre] = useState("");
   const [favoriteArtist, setFavoriteArtist] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingLessonId, setLoadingLessonId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadedLessonTitle, setLoadedLessonTitle] = useState<string | null>(
+    null,
+  );
   const [analysis, setAnalysis] = useState<LyricsAnalysisResult | null>(null);
   const [persona, setPersona] = useState<Persona>(MEI_PERSONA);
   const [isDemo, setIsDemo] = useState(false);
@@ -30,6 +40,33 @@ export function LyricsModule() {
     vocabularyCount: number;
   } | null>(null);
   const [debug, setDebug] = useState<AnalyzeLyricsResponse["debug"]>();
+  const speakRef = useRef<SpeakFn | null>(null);
+
+  const handleSpeakReady = useCallback((speak: SpeakFn) => {
+    speakRef.current = speak;
+  }, []);
+
+  const handleMeiSpeak = useCallback((text: string) => {
+    void speakRef.current?.(text);
+  }, []);
+
+  useEffect(() => {
+    const draft = loadLyricsDraft();
+    if (!draft) return;
+    setLyrics(draft.lyrics);
+    setMusicGenre(draft.musicGenre);
+    setFavoriteArtist(draft.favoriteArtist);
+  }, []);
+
+  useEffect(() => {
+    if (!lyrics && !musicGenre && !favoriteArtist) return;
+
+    const timer = window.setTimeout(() => {
+      saveLyricsDraft({ lyrics, musicGenre, favoriteArtist });
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [lyrics, musicGenre, favoriteArtist]);
 
   useEffect(() => {
     fetch("/api/personas/music")
@@ -71,10 +108,51 @@ export function LyricsModule() {
       setIsDemo(Boolean(data.demo));
       setSavedInfo(data.saved ?? null);
       setDebug(data.debug);
+      setLoadedLessonTitle(null);
+      saveLyricsDraft({ lyrics, musicGenre, favoriteArtist });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur réseau");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleLoadSavedLesson(lessonId: string) {
+    setLoadingLessonId(lessonId);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/lessons/lyrics/${lessonId}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Impossible de charger la lecon");
+      }
+
+      setLyrics(data.lesson.sourceContent);
+      setLoadedLessonTitle(data.lesson.title);
+      setSavedInfo({ lessonId: data.lesson.id, vocabularyCount: 0 });
+      setDebug(undefined);
+      setIsDemo(false);
+
+      if (data.lesson.analysis) {
+        setAnalysis(data.lesson.analysis);
+      } else {
+        setAnalysis(null);
+        setError(
+          "Paroles chargees. Relancez l'analyse pour regenerer les exercices.",
+        );
+      }
+
+      saveLyricsDraft({
+        lyrics: data.lesson.sourceContent,
+        musicGenre,
+        favoriteArtist,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur de chargement");
+    } finally {
+      setLoadingLessonId(null);
     }
   }
 
@@ -84,7 +162,7 @@ export function LyricsModule() {
       <section className="mb-12">
         <div className="mb-8">
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-amber-500/80">
-            Module Paroles
+            Module Paroles · interactif
           </p>
           <h1 className="font-display text-4xl font-light text-zinc-50 sm:text-5xl">
             Vos chansons,
@@ -95,6 +173,13 @@ export function LyricsModule() {
             le vocabulaire clé, les idiomes et génère des exercices adaptés à
             votre niveau.
           </p>
+        </div>
+
+        <div className="mb-6">
+          <SavedLyricsPicker
+            onSelect={handleLoadSavedLesson}
+            loadingId={loadingLessonId}
+          />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -140,9 +225,15 @@ export function LyricsModule() {
           </label>
 
           <p className="text-xs text-zinc-600">
-            Usage personnel uniquement — vos paroles restent privées et ne sont
-            pas partagées entre utilisateurs.
+            Votre brouillon est sauvegarde dans ce navigateur. Connecte, vos
+            analyses sont aussi enregistrees dans Mes paroles sauvegardees.
           </p>
+
+          {loadedLessonTitle && (
+            <p className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 text-sm text-violet-200">
+              Lecon chargee : {loadedLessonTitle}
+            </p>
+          )}
 
           {error && (
             <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
@@ -179,13 +270,21 @@ export function LyricsModule() {
           )}
           <PersonaSpeaker
             persona={persona}
-            speechText={analysis.coachSpeechEn}
+            speechText={analysis.coachSpeechEn ?? "Hi! I'm Mei. Let's practice this song together."}
             subtitle={analysis.summary}
+            autoSpeak
+            onSpeakReady={handleSpeakReady}
           />
           <AnalysisHeader analysis={analysis} />
-          <VocabularyList items={analysis.vocabulary} />
+          <VocabularyList
+            items={analysis.vocabulary}
+            onSpeakWord={handleMeiSpeak}
+          />
           <IdiomsList items={analysis.idioms} />
-          <ClozeExerciseCard exercise={analysis.clozeExercise} />
+          <ClozeExerciseCard
+            exercise={analysis.clozeExercise}
+            onVerified={handleMeiSpeak}
+          />
           <ComprehensionQuestions questions={analysis.comprehensionQuestions} />
 
           {analysis.culturalNotes && analysis.culturalNotes.length > 0 && (

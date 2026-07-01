@@ -45,7 +45,7 @@ export const comprehensionQuestionSchema = z.object({
 /** Schéma complet de sortie de l'analyse de paroles */
 export const lyricsAnalysisSchema = z.object({
   summary: z.string().min(1),
-  coachSpeechEn: z.string().min(1),
+  coachSpeechEn: z.string().min(1).optional(),
   overallDifficulty: z.enum(["A1", "A2", "B1", "B2", "C1"]),
   vocabulary: z.array(vocabularyItemSchema).min(3).max(20),
   idioms: z.array(idiomSchema).max(10),
@@ -108,7 +108,11 @@ CRITICAL RULES:
 - Never reproduce the full lyrics in your output — only short context snippets (max 15 words each).
 - Adapt difficulty to the learner profile below.
 - Extract vocabulary that is emotionally and contextually meaningful, not random rare words.
-- For cloze exercise: replace 6-10 key vocabulary words with [BLANK] markers in order.
+- For cloze exercise: replace exactly 6 key vocabulary words with [BLANK] markers in order.
+- clozeExercise.textWithBlanks MUST be a single coherent excerpt of 4-6 consecutive lines from the lyrics.
+- Separate each lyric line with a newline character (\\n). One [BLANK] per line maximum.
+- Do NOT repeat phrases. Do NOT jump between unrelated parts of the song.
+- clozeExercise.instructions must tell the learner to fill numbered blanks 1 to 6 in order (in French).
 - Comprehension questions: mix comprehension, reflection, and vocabulary (3-5 total).
 
 Learner profile:
@@ -136,8 +140,8 @@ JSON schema (strict):
     "exampleInContext": "string — short excerpt"
   }],
   "clozeExercise": {
-    "instructions": "string (French)",
-    "textWithBlanks": "string — lyrics excerpt with [BLANK] markers",
+    "instructions": "string (French) — explain there are 6 numbered blanks to fill in order",
+    "textWithBlanks": "string — 4-6 consecutive lyric lines separated by \\n, each with at most one [BLANK]",
     "answers": [{ "blankIndex": 0, "word": "string", "hint": "string optional (French)" }]
   },
   "comprehensionQuestions": [{
@@ -161,5 +165,11 @@ Generate the JSON pedagogical content now.`;
 }
 
 export function parseLyricsAnalysis(raw: unknown): LyricsAnalysisResult {
-  return lyricsAnalysisSchema.parse(raw);
+  const parsed = lyricsAnalysisSchema.parse(raw);
+  return {
+    ...parsed,
+    coachSpeechEn:
+      parsed.coachSpeechEn ??
+      "Hi! I'm Mei. Let's practice this song together.",
+  };
 }

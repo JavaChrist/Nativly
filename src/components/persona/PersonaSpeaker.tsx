@@ -1,138 +1,39 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import Image from "next/image";
 import type { Persona } from "@/lib/types/persona";
+import { usePersonaSpeech, type SpeakFn } from "@/hooks/usePersonaSpeech";
 
 interface PersonaSpeakerProps {
   persona: Persona;
   speechText: string;
   subtitle?: string;
-}
-
-function pickEnglishFemaleVoice(): SpeechSynthesisVoice | null {
-  if (typeof window === "undefined" || !window.speechSynthesis) {
-    return null;
-  }
-
-  const voices = window.speechSynthesis.getVoices();
-  const preferred = voices.find(
-    (voice) =>
-      voice.lang.startsWith("en") &&
-      /female|samantha|victoria|zira|karen|moira|fiona/i.test(
-        `${voice.name} ${voice.voiceURI}`,
-      ),
-  );
-
-  if (preferred) return preferred;
-
-  return voices.find((voice) => voice.lang.startsWith("en")) ?? null;
+  autoSpeak?: boolean;
+  onSpeakReady?: (speak: SpeakFn) => void;
 }
 
 export function PersonaSpeaker({
   persona,
   speechText,
   subtitle,
+  autoSpeak = false,
+  onSpeakReady,
 }: PersonaSpeakerProps) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [voiceMode, setVoiceMode] = useState<"elevenlabs" | "browser" | null>(
-    null,
-  );
-  const [error, setError] = useState<string | null>(null);
-
-  const stop = useCallback(() => {
-    audioRef.current?.pause();
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0;
-    }
-    window.speechSynthesis?.cancel();
-    setIsSpeaking(false);
-    setIsLoading(false);
-  }, []);
+  const { speak, stop, isSpeaking, isLoading, voiceMode, error } =
+    usePersonaSpeech(persona.voiceId);
+  const lastAutoText = useRef<string | null>(null);
 
   useEffect(() => {
-    return () => {
-      stop();
-      if (audioRef.current?.src.startsWith("blob:")) {
-        URL.revokeObjectURL(audioRef.current.src);
-      }
-    };
-  }, [stop]);
+    onSpeakReady?.(speak);
+  }, [onSpeakReady, speak]);
 
-  const speakWithBrowser = useCallback(() => {
-    if (!window.speechSynthesis) {
-      setError("La synthese vocale du navigateur n'est pas disponible.");
-      return;
-    }
-
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(speechText);
-    utterance.lang = "en-US";
-    utterance.rate = 0.95;
-    utterance.voice = pickEnglishFemaleVoice();
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => {
-      setIsSpeaking(false);
-      setError("Lecture vocale interrompue.");
-    };
-    utteranceRef.current = utterance;
-    setVoiceMode("browser");
-    window.speechSynthesis.speak(utterance);
-  }, [speechText]);
-
-  const speak = useCallback(async () => {
-    stop();
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      const response = await fetch("/api/speech", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: speechText,
-          voiceId: persona.voiceId ?? undefined,
-        }),
-      });
-
-      if (response.status === 503) {
-        speakWithBrowser();
-        return;
-      }
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? "Impossible de generer la voix");
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onplay = () => setIsSpeaking(true);
-      audio.onended = () => {
-        setIsSpeaking(false);
-        URL.revokeObjectURL(url);
-      };
-      audio.onerror = () => {
-        setIsSpeaking(false);
-        setError("Lecture audio impossible.");
-      };
-      setVoiceMode("elevenlabs");
-      await audio.play();
-    } catch (err) {
-      speakWithBrowser();
-      if (err instanceof Error && !window.speechSynthesis) {
-        setError(err.message);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [persona.voiceId, speakWithBrowser, speechText, stop]);
+  useEffect(() => {
+    if (!autoSpeak || !speechText) return;
+    if (lastAutoText.current === speechText) return;
+    lastAutoText.current = speechText;
+    void speak(speechText);
+  }, [autoSpeak, speak, speechText]);
 
   return (
     <section className="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-violet-950/40 via-zinc-900/80 to-amber-950/20 p-6">
@@ -169,7 +70,7 @@ export function PersonaSpeaker({
 
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-500/80">
-            Votre coach
+            Votre prof
           </p>
           <h2 className="font-display text-2xl text-zinc-50">{persona.name}</h2>
           {persona.toneDescription && (
@@ -185,38 +86,51 @@ export function PersonaSpeaker({
             )}
           </div>
 
-          {error && (
-            <p className="mt-3 text-xs text-rose-300">{error}</p>
-          )}
+          {error && <p className="mt-3 text-xs text-rose-300">{error}</p>}
 
-          <div className="mt-4 flex flex-wrap items-center gap-3">
+          <div className="mt-4 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={speak}
+              onClick={() => speak(speechText)}
               disabled={isLoading || isSpeaking}
-              className="rounded-full bg-amber-500 px-5 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-amber-400 disabled:opacity-50"
+              className="rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-amber-400 disabled:opacity-50"
             >
-              {isLoading
-                ? "Preparation..."
-                : isSpeaking
-                  ? "En lecture..."
-                  : `Ecouter ${persona.name}`}
+              {isLoading ? "..." : isSpeaking ? "Parle..." : "Ecouter Mei"}
+            </button>
+            <button
+              type="button"
+              onClick={() => speak(speechText)}
+              disabled={isLoading || isSpeaking}
+              className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+            >
+              Repeter
+            </button>
+            <button
+              type="button"
+              onClick={() => speak(speechText, { slow: true })}
+              disabled={isLoading || isSpeaking}
+              className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+            >
+              Plus lentement
             </button>
             {(isSpeaking || isLoading) && (
               <button
                 type="button"
                 onClick={stop}
-                className="rounded-full border border-white/10 px-4 py-2.5 text-sm text-zinc-300 hover:bg-white/5"
+                className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-300 hover:bg-white/5"
               >
                 Stop
               </button>
             )}
-            {voiceMode === "browser" && !isSpeaking && !isLoading && (
-              <span className="text-xs text-zinc-600">
-                Voix navigateur (ajoutez ELEVENLABS_API_KEY pour une voix premium)
-              </span>
-            )}
           </div>
+
+          <p className="mt-3 text-xs text-zinc-600">
+            Apres l&apos;analyse, cliquez <strong className="text-zinc-400">Ecouter Mei</strong>{" "}
+            (le navigateur bloque souvent la lecture automatique). Mei corrige aussi
+            l&apos;exercice a trous et lit le vocabulaire via les boutons dedies.
+            {voiceMode === "browser" &&
+              " Voix navigateur active (ajoutez ELEVENLABS_API_KEY pour la voix premium)."}
+          </p>
         </div>
       </div>
     </section>

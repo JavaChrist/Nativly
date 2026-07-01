@@ -1,6 +1,7 @@
 "use client";
 
 import type { VocabularyItem } from "@/lib/prompts/analyze-lyrics";
+import { buildVocabularySpeech } from "@/lib/lyrics/cloze-utils";
 import { CEFR_LEVELS } from "@/lib/types/cefr";
 
 const LEVEL_COLORS: Record<string, string> = {
@@ -13,9 +14,10 @@ const LEVEL_COLORS: Record<string, string> = {
 
 interface VocabularyListProps {
   items: VocabularyItem[];
+  onSpeakWord?: (speech: string) => void;
 }
 
-export function VocabularyList({ items }: VocabularyListProps) {
+export function VocabularyList({ items, onSpeakWord }: VocabularyListProps) {
   return (
     <section>
       <h2 className="mb-4 font-display text-2xl text-zinc-100">
@@ -44,6 +46,17 @@ export function VocabularyList({ items }: VocabularyListProps) {
             <p className="border-l-2 border-amber-500/30 pl-3 text-sm italic text-zinc-400">
               &ldquo;{item.contextSentence}&rdquo;
             </p>
+            {onSpeakWord && (
+              <button
+                type="button"
+                onClick={() =>
+                  onSpeakWord(buildVocabularySpeech(item.word, item.translation))
+                }
+                className="mt-3 rounded-full border border-amber-500/30 px-3 py-1 text-xs text-amber-200 transition hover:bg-amber-500/10"
+              >
+                Mei — ecouter et repeter
+              </button>
+            )}
           </article>
         ))}
       </div>
