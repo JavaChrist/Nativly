@@ -12,15 +12,18 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/onboarding";
   const authError = searchParams.get("error");
+  const authErrorReason = searchParams.get("reason");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(
-    authError ? "Connexion annulee ou echouee. Reessayez." : null,
-  );
+  const [message, setMessage] = useState<string | null>(() => {
+    if (!authError) return null;
+    if (authErrorReason) return authErrorReason;
+    return "Connexion annulee ou echouee. Reessayez.";
+  });
   const [messageIsSuccess, setMessageIsSuccess] = useState(false);
 
   const supabase = createClient();
