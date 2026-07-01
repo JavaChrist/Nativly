@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { LyricsAnalysisResult } from "@/lib/prompts/analyze-lyrics";
 import type { AnalyzeLyricsResponse } from "@/app/api/analyze-lyrics/route";
+import type { Persona } from "@/lib/types/persona";
+import { MEI_PERSONA } from "@/lib/personas/mei";
 import {
   AnalysisHeader,
   DebugPanel,
@@ -12,6 +14,7 @@ import { VocabularyList } from "@/components/lyrics/VocabularyList";
 import { IdiomsList } from "@/components/lyrics/IdiomsList";
 import { ClozeExerciseCard } from "@/components/lyrics/ClozeExerciseCard";
 import { ComprehensionQuestions } from "@/components/lyrics/ComprehensionQuestions";
+import { PersonaSpeaker } from "@/components/persona/PersonaSpeaker";
 
 export function LyricsModule() {
   const [lyrics, setLyrics] = useState("");
@@ -20,12 +23,24 @@ export function LyricsModule() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<LyricsAnalysisResult | null>(null);
+  const [persona, setPersona] = useState<Persona>(MEI_PERSONA);
   const [isDemo, setIsDemo] = useState(false);
   const [savedInfo, setSavedInfo] = useState<{
     lessonId: string;
     vocabularyCount: number;
   } | null>(null);
   const [debug, setDebug] = useState<AnalyzeLyricsResponse["debug"]>();
+
+  useEffect(() => {
+    fetch("/api/personas/music")
+      .then((res) => res.json())
+      .then((data: { persona?: Persona }) => {
+        if (data.persona) setPersona(data.persona);
+      })
+      .catch(() => {
+        setPersona(MEI_PERSONA);
+      });
+  }, []);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -162,6 +177,11 @@ export function LyricsModule() {
               personnelle.
             </div>
           )}
+          <PersonaSpeaker
+            persona={persona}
+            speechText={analysis.coachSpeechEn}
+            subtitle={analysis.summary}
+          />
           <AnalysisHeader analysis={analysis} />
           <VocabularyList items={analysis.vocabulary} />
           <IdiomsList items={analysis.idioms} />

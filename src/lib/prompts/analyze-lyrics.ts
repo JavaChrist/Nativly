@@ -45,6 +45,7 @@ export const comprehensionQuestionSchema = z.object({
 /** Schéma complet de sortie de l'analyse de paroles */
 export const lyricsAnalysisSchema = z.object({
   summary: z.string().min(1),
+  coachSpeechEn: z.string().min(1),
   overallDifficulty: z.enum(["A1", "A2", "B1", "B2", "C1"]),
   vocabulary: z.array(vocabularyItemSchema).min(3).max(20),
   idioms: z.array(idiomSchema).max(10),
@@ -118,6 +119,7 @@ ${personalization ? `\nPersonalization:\n${personalization}` : ""}
 JSON schema (strict):
 {
   "summary": "string — 2-3 sentences in French about the song's themes and language level",
+  "coachSpeechEn": "string — 2-4 warm sentences in ENGLISH spoken by Mei introducing the lesson (mention 2-3 key vocabulary words)",
   "overallDifficulty": "A1|A2|B1|B2|C1",
   "vocabulary": [{
     "word": "string",

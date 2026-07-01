@@ -34,6 +34,8 @@ function getDemoAnalysis(): LyricsAnalysisResult {
   return {
     summary:
       "Mode démo — configurez ANTHROPIC_API_KEY pour une analyse réelle. Ce texte illustre la structure des résultats.",
+    coachSpeechEn:
+      "Hi! I'm Mei, your music English coach. This demo shows how I'll introduce your lesson. Add your Anthropic key for a real analysis — we'll explore vocabulary like wonder, heartbreak, and hold on together!",
     overallDifficulty: "B1",
     vocabulary: [
       {
