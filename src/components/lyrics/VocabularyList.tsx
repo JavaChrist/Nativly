@@ -3,6 +3,7 @@
 import type { VocabularyItem } from "@/lib/prompts/analyze-lyrics";
 import { buildVocabularySpeech } from "@/lib/lyrics/cloze-utils";
 import { CEFR_LEVELS } from "@/lib/types/cefr";
+import { PronunciationCheck } from "@/components/lyrics/PronunciationCheck";
 
 const LEVEL_COLORS: Record<string, string> = {
   A1: "bg-emerald-500/20 text-emerald-300",
@@ -47,15 +48,23 @@ export function VocabularyList({ items, onSpeakWord }: VocabularyListProps) {
               &ldquo;{item.contextSentence}&rdquo;
             </p>
             {onSpeakWord && (
-              <button
-                type="button"
-                onClick={() =>
-                  onSpeakWord(buildVocabularySpeech(item.word, item.translation))
-                }
-                className="mt-3 rounded-full border border-amber-500/30 px-3 py-1 text-xs text-amber-200 transition hover:bg-amber-500/10"
-              >
-                Mei — ecouter et repeter
-              </button>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    onSpeakWord(
+                      buildVocabularySpeech(item.word, item.translation),
+                    )
+                  }
+                  className="rounded-full border border-amber-500/30 px-3 py-1 text-xs text-amber-200 transition hover:bg-amber-500/10"
+                >
+                  Mei — ecouter et repeter
+                </button>
+                <PronunciationCheck
+                  target={item.word}
+                  onFeedbackSpeech={onSpeakWord}
+                />
+              </div>
             )}
           </article>
         ))}

@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { PasswordField } from "@/components/auth/PasswordField";
 
 export function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/onboarding";
   const authError = searchParams.get("error");
@@ -56,8 +55,11 @@ export function LoginForm() {
           password,
         });
         if (error) throw error;
-        router.push(next);
-        router.refresh();
+        // Navigation pleine page : garantit que les cookies de session
+        // sont transmis au middleware des la premiere requete (evite la
+        // redirection login au premier clic sur une route protegee).
+        window.location.assign(next);
+        return;
       }
     } catch (err) {
       showFeedback(err instanceof Error ? err.message : "Erreur de connexion");

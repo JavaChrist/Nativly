@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { THEMES } from "@/lib/types/themes";
 import { AuthButton } from "@/components/auth/AuthButton";
+import { ScrollNavLink } from "@/components/layout/ScrollNavLink";
 
 const NAV_ITEMS = [
   { href: "/", label: "Accueil" },
@@ -48,15 +49,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <div className="ml-auto flex items-center gap-2">
             <nav className="hidden items-center gap-1 sm:flex">
-              {NAV_ITEMS.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="rounded-full px-4 py-2 text-sm text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
-                >
-                  {item.label}
-                </Link>
-              ))}
+              {NAV_ITEMS.map((item) =>
+                item.href === "/music/lyrics" ? (
+                  <ScrollNavLink
+                    key={item.href}
+                    href={item.href}
+                    label={item.label}
+                    scrollTargetId="lyrics-module"
+                  />
+                ) : (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="rounded-full px-4 py-2 text-sm text-zinc-400 transition hover:bg-white/5 hover:text-zinc-200"
+                  >
+                    {item.label}
+                  </Link>
+                ),
+              )}
             </nav>
             <AuthButton />
           </div>

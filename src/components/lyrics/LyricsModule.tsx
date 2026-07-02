@@ -5,7 +5,10 @@ import type { LyricsAnalysisResult } from "@/lib/prompts/analyze-lyrics";
 import type { AnalyzeLyricsResponse } from "@/app/api/analyze-lyrics/route";
 import type { Persona } from "@/lib/types/persona";
 import { MEI_PERSONA } from "@/lib/personas/mei";
-import type { SpeakFn } from "@/hooks/usePersonaSpeech";
+import {
+  unlockAudioPlayback,
+  usePersonaSpeech,
+} from "@/hooks/usePersonaSpeech";
 import {
   AnalysisHeader,
   DebugPanel,
@@ -21,6 +24,13 @@ import {
   loadLyricsDraft,
   saveLyricsDraft,
 } from "@/lib/lyrics/draft-storage";
+
+const MEI_INTRO_FALLBACK =
+  "Hi! I'm Mei. Let's practice this song together.";
+
+function getMeiIntro(analysis: LyricsAnalysisResult): string {
+  return analysis.coachSpeechEn ?? MEI_INTRO_FALLBACK;
+}
 
 export function LyricsModule() {
   const [lyrics, setLyrics] = useState("");
@@ -40,15 +50,19 @@ export function LyricsModule() {
     vocabularyCount: number;
   } | null>(null);
   const [debug, setDebug] = useState<AnalyzeLyricsResponse["debug"]>();
-  const speakRef = useRef<SpeakFn | null>(null);
+  const resultsRef = useRef<HTMLElement>(null);
+  const pendingMeiIntroRef = useRef<string | null>(null);
 
-  const handleSpeakReady = useCallback((speak: SpeakFn) => {
-    speakRef.current = speak;
-  }, []);
+  const speech = usePersonaSpeech(persona.voiceId);
+  const { speak } = speech;
 
-  const handleMeiSpeak = useCallback((text: string) => {
-    void speakRef.current?.(text);
-  }, []);
+  const handleMeiSpeak = useCallback(
+    (text: string) => {
+      unlockAudioPlayback();
+      void speak(text);
+    },
+    [speak],
+  );
 
   useEffect(() => {
     const draft = loadLyricsDraft();
@@ -56,6 +70,16 @@ export function LyricsModule() {
     setLyrics(draft.lyrics);
     setMusicGenre(draft.musicGenre);
     setFavoriteArtist(draft.favoriteArtist);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hash !== "#lyrics-module") return;
+
+    document.getElementById("lyrics-module")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
   }, []);
 
   useEffect(() => {
@@ -79,13 +103,36 @@ export function LyricsModule() {
       });
   }, []);
 
+  useEffect(() => {
+    if (!analysis) return;
+
+    const intro = pendingMeiIntroRef.current;
+    if (!intro) return;
+
+    pendingMeiIntroRef.current = null;
+
+    requestAnimationFrame(() => {
+      resultsRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      void speak(intro);
+    });
+  }, [analysis, speak]);
+
+  function queueMeiIntro(text: string) {
+    pendingMeiIntroRef.current = text;
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    unlockAudioPlayback();
     setLoading(true);
     setError(null);
     setAnalysis(null);
     setSavedInfo(null);
     setDebug(undefined);
+    pendingMeiIntroRef.current = null;
 
     try {
       const response = await fetch("/api/analyze-lyrics", {
@@ -104,6 +151,7 @@ export function LyricsModule() {
         throw new Error(data.error ?? "Erreur inconnue");
       }
 
+      queueMeiIntro(getMeiIntro(data.analysis));
       setAnalysis(data.analysis);
       setIsDemo(Boolean(data.demo));
       setSavedInfo(data.saved ?? null);
@@ -118,8 +166,10 @@ export function LyricsModule() {
   }
 
   async function handleLoadSavedLesson(lessonId: string) {
+    unlockAudioPlayback();
     setLoadingLessonId(lessonId);
     setError(null);
+    pendingMeiIntroRef.current = null;
 
     try {
       const response = await fetch(`/api/lessons/lyrics/${lessonId}`);
@@ -136,6 +186,7 @@ export function LyricsModule() {
       setIsDemo(false);
 
       if (data.lesson.analysis) {
+        queueMeiIntro(getMeiIntro(data.lesson.analysis));
         setAnalysis(data.lesson.analysis);
       } else {
         setAnalysis(null);
@@ -157,7 +208,7 @@ export function LyricsModule() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div id="lyrics-module" className="mx-auto max-w-4xl scroll-mt-24">
       {/* Formulaire */}
       <section className="mb-12">
         <div className="mb-8">
@@ -244,6 +295,7 @@ export function LyricsModule() {
           <button
             type="submit"
             disabled={loading || lyrics.trim().length < 20}
+            onPointerDown={unlockAudioPlayback}
             className="group relative overflow-hidden rounded-full bg-amber-500 px-8 py-3.5 text-sm font-semibold text-zinc-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {loading ? (
@@ -260,7 +312,10 @@ export function LyricsModule() {
 
       {/* Résultats */}
       {analysis && (
-        <section className="space-y-12 border-t border-white/5 pt-12">
+        <section
+          ref={resultsRef}
+          className="space-y-12 border-t border-white/5 pt-12"
+        >
           {isDemo && <DemoBanner />}
           {savedInfo && (
             <div className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
@@ -270,10 +325,9 @@ export function LyricsModule() {
           )}
           <PersonaSpeaker
             persona={persona}
-            speechText={analysis.coachSpeechEn ?? "Hi! I'm Mei. Let's practice this song together."}
+            speechText={getMeiIntro(analysis)}
             subtitle={analysis.summary}
-            autoSpeak
-            onSpeakReady={handleSpeakReady}
+            speech={speech}
           />
           <AnalysisHeader analysis={analysis} />
           <VocabularyList

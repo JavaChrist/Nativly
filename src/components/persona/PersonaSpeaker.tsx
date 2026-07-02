@@ -1,39 +1,25 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import Image from "next/image";
 import type { Persona } from "@/lib/types/persona";
-import { usePersonaSpeech, type SpeakFn } from "@/hooks/usePersonaSpeech";
+import type { usePersonaSpeech } from "@/hooks/usePersonaSpeech";
+
+type PersonaSpeechControls = ReturnType<typeof usePersonaSpeech>;
 
 interface PersonaSpeakerProps {
   persona: Persona;
   speechText: string;
   subtitle?: string;
-  autoSpeak?: boolean;
-  onSpeakReady?: (speak: SpeakFn) => void;
+  speech: PersonaSpeechControls;
 }
 
 export function PersonaSpeaker({
   persona,
   speechText,
   subtitle,
-  autoSpeak = false,
-  onSpeakReady,
+  speech,
 }: PersonaSpeakerProps) {
-  const { speak, stop, isSpeaking, isLoading, voiceMode, error } =
-    usePersonaSpeech(persona.voiceId);
-  const lastAutoText = useRef<string | null>(null);
-
-  useEffect(() => {
-    onSpeakReady?.(speak);
-  }, [onSpeakReady, speak]);
-
-  useEffect(() => {
-    if (!autoSpeak || !speechText) return;
-    if (lastAutoText.current === speechText) return;
-    lastAutoText.current = speechText;
-    void speak(speechText);
-  }, [autoSpeak, speak, speechText]);
+  const { speak, stop, isSpeaking, isLoading, voiceMode, error } = speech;
 
   return (
     <section className="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-violet-950/40 via-zinc-900/80 to-amber-950/20 p-6">
@@ -125,9 +111,9 @@ export function PersonaSpeaker({
           </div>
 
           <p className="mt-3 text-xs text-zinc-600">
-            Apres l&apos;analyse, cliquez <strong className="text-zinc-400">Ecouter Mei</strong>{" "}
-            (le navigateur bloque souvent la lecture automatique). Mei corrige aussi
-            l&apos;exercice a trous et lit le vocabulaire via les boutons dedies.
+            Mei parle automatiquement apres l&apos;analyse ou quand vous rouvrez une lecon.
+            Si le navigateur bloque la voix, cliquez <strong className="text-zinc-400">Ecouter Mei</strong>.
+            Mei corrige aussi l&apos;exercice a trous et lit le vocabulaire via les boutons dedies.
             {voiceMode === "browser" &&
               " Voix navigateur active (ajoutez ELEVENLABS_API_KEY pour la voix premium)."}
           </p>

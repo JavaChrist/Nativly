@@ -2,6 +2,43 @@
 
 import { useCallback, useRef, useState } from "react";
 
+let audioUnlocked = false;
+
+/** A appeler pendant le geste utilisateur (clic) pour autoriser la lecture apres un fetch async. */
+export function unlockAudioPlayback() {
+  if (typeof window === "undefined" || audioUnlocked) return;
+
+  try {
+    const AudioCtx =
+      window.AudioContext ??
+      (window as Window & { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (AudioCtx) {
+      const ctx = new AudioCtx();
+      void ctx.resume();
+    }
+  } catch {
+    /* ignore */
+  }
+
+  if (window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(" ");
+    utterance.volume = 0;
+    window.speechSynthesis.speak(utterance);
+  }
+
+  const silent = new Audio(
+    "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA",
+  );
+  silent.volume = 0.001;
+  void silent.play().then(() => {
+    audioUnlocked = true;
+  }).catch(() => {
+    /* le navigateur peut encore bloquer ; on retentera au prochain clic */
+  });
+}
+
 function pickEnglishFemaleVoice(): SpeechSynthesisVoice | null {
   if (typeof window === "undefined" || !window.speechSynthesis) {
     return null;
@@ -100,8 +137,16 @@ export function usePersonaSpeech(voiceId?: string | null) {
           setError("Lecture audio impossible.");
         };
         setVoiceMode("elevenlabs");
-        await audio.play();
-      } catch {
+        try {
+          await audio.play();
+        } catch {
+          setError("Cliquez « Ecouter Mei » pour demarrer la voix.");
+          throw new Error("autoplay_blocked");
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message === "autoplay_blocked") {
+          return;
+        }
         speakWithBrowser(text, options?.slow ? 0.78 : 0.95);
       } finally {
         setIsLoading(false);
